@@ -2,16 +2,29 @@ require('dotenv').config();
 
 var createError = require('http-errors');
 var express = require('express');
+const bodyParser = require('body-parser'); // parser middleware
 var path = require('path');
-var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 var session = require('express-session');
 var passport = require('passport');
-var SQLiteStore = require('connect-sqlite3')(session);
 var indexRouter = require('./routes/index');
 var authRouter = require('./routes/auth');
 
 var app = express();
+
+app.use(session({
+  secret: 'fsdsfdjmnMDMGhgdsf9kj987y',
+  resave: true,                       // Don't save the session on every request
+  saveUninitialized: true,            // Don't create a session until something is stored
+  cookie: {
+    secure: false,
+    maxAge: 6000000
+  },
+}));
+
+// Initialize Passport and session support
+app.use(passport.initialize());
+app.use(passport.session());
 
 app.locals.pluralize = require('pluralize');
 
@@ -22,17 +35,9 @@ app.set('view engine', 'ejs');
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser());
+app.use(bodyParser.urlencoded({ extended: false })); // Add this line to enable body-parser
+
 app.use(express.static(path.join(__dirname, 'public')));
-
-app.use(session({
-  secret: 'fsdsfdjmnMDMGhgdsf9kj987y',
-  resave: false,
-  saveUninitialized: false,
-  store: new SQLiteStore({ db: 'sessions.db', dir: './var/db' })
-}));
-
-app.use(passport.authenticate('session'));
 
 app.use('/', indexRouter);
 app.use('/', authRouter);

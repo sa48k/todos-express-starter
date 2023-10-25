@@ -11,8 +11,9 @@ passport.use(new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
   callbackURL: '/oauth2/redirect/google',
+  passReqToCallback: true,
   scope: ['profile'],
-}, async (accessToken, refreshToken, profile, done) => {
+}, async (req, accessToken, refreshToken, profile, done) => {
   try {
     const client = new MongoClient(mongoURL);
     await client.connect();
@@ -22,12 +23,15 @@ passport.use(new GoogleStrategy({
     console.log('Display Name:', profile.displayName);
     console.log('Access Token:', accessToken);
     console.log('Refresh Token:', refreshToken);
+
     // Check if the user already exists in the database
     const existingUser = await db.collection('users').findOne({ id: profile.id });
 
     if (existingUser) {
       client.close();
       console.log('user already in db');
+      req.session.access_token = accessToken;
+      console.log('REQ.SESSION: ', req.session)
       return done(null, existingUser);
     }
 
@@ -43,6 +47,8 @@ passport.use(new GoogleStrategy({
     newUser._id = result.insertedId;
 
     client.close();
+    req.session.access_token = accessToken;
+    console.log('REQ.SESSION: ', req.session)
     done(null, newUser);
   } catch (error) {
     done(error, null);
@@ -64,6 +70,14 @@ passport.deserializeUser(function (user, cb) {
 router.get('/login', function(req, res, next) {
   res.render('login');
 });
+router.get('/token', function (req, res, next) {
+  console.log('Authenticated? ', req.isAuthenticated())
+  console.log(req.session);
+  console.log('token:', req.session.access_token)
+  res.send(`Hello ${JSON.stringify(req.user)}. Your session ID is ${req.sessionID} 
+   and your session expires in ${req.session.cookie.maxAge} 
+   milliseconds.<br><br>Session: <pre>${JSON.stringify(req.session)}</pre>`)
+})
 
 router.get('/login/federated/google', passport.authenticate('google', {
   accessType: 'offline',
